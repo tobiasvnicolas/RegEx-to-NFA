@@ -1,0 +1,11 @@
+digraph NFA {
+  18 [label="start"];
+  19 [label="accept"];
+  20 [label="start"];
+  21 [label="accept"];
+  16 -> 14 [label=""];
+  15 -> 14 [label=""];
+  15 -> 17 [label=""];
+  16 -> 17 [label=""];
+  14 -> 15 [label="c"];
+}

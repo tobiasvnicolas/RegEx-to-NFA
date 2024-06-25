@@ -1,0 +1,3 @@
+FORMATO DOT: dot -Tpng graph.dot -o graph.png
+
+FORMATO TXT: dot -Tpng graph.txt -o graph.png

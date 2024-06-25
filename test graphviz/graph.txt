@@ -1,0 +1,12 @@
+digraph G {
+nodo0[label="q0"];
+nodo1[label="q1"];
+nodo0->nodo1;
+nodo2[label="q2"];
+nodo0->nodo2;
+nodo1->nodo2;
+nodo3[label="q3"];
+nodo2->nodo3;
+nodo3->nodo3;
+nodo2->nodo1;
+}
