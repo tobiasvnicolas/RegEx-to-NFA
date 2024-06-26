@@ -12,4 +12,4 @@ Proyecto universitario
 
 `cd output`
 
-`.\main.exe ..\regex.json ..\output.json`
+`.\main.exe ..\regex.json .\output.json`
