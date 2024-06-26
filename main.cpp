@@ -8,19 +8,20 @@
 #include <stack>
 #include "json.hpp"
 
+using namespace std;
 using json = nlohmann::json;
 
-const std::string ALLOWED = "0123456789qwertyuiopasdfghjklzxcvbnm*.+()$";
-const std::unordered_set<char> OPS = {'*', '.', '+', '(', ')'};
-const std::unordered_map<char, int> PRIORITY = {{'*', 2}, {'.', 1}, {'+', 0}};
+const string ALLOWED = "0123456789qwertyuiopasdfghjklzxcvbnm*.+()$";
+const unordered_set<char> OPS = {'*', '.', '+', '(', ')'};
+const unordered_map<char, int> PRIORITY = {{'*', 2}, {'.', 1}, {'+', 0}};
 const int INVALID_REGEX = -1;
 const int VALID_REGEX = 0;
 
 class State {
 public:
     int id;
-    std::string name;
-    std::vector<std::pair<State*, char>> transitions;
+    string name;
+    vector<pair<State*, char>> transitions;
     static int count;
 
     State() : id(count++), name("") {}
@@ -34,14 +35,14 @@ int State::count = 0;
 
 class NFA {
 public:
-    std::vector<State*> states;
+    vector<State*> states;
     State* start;
-    std::vector<State*> accept;
-    std::unordered_set<char> alphabet;
+    vector<State*> accept;
+    unordered_set<char> alphabet;
 
     NFA() : start(nullptr) {}
 
-    void getAlph(const std::string& regex) {
+    void getAlph(const string& regex) {
         for (char c : regex) {
             if (OPS.find(c) == OPS.end() && alphabet.find(c) == alphabet.end()) {
                 alphabet.insert(c);
@@ -66,37 +67,37 @@ public:
     }
 
     void removeAccept(State* s) {
-        accept.erase(std::remove(accept.begin(), accept.end(), s), accept.end());
+        accept.erase(remove(accept.begin(), accept.end(), s), accept.end());
     }
 
     void names() {
         int c = 0;
-        start->name = "q" + std::to_string(c++);
-        std::vector<State*> states_queue = {start};
+        start->name = "q" + to_string(c++);
+        vector<State*> states_queue = {start};
         while (!states_queue.empty()) {
             State* cur = states_queue.front();
             states_queue.erase(states_queue.begin());
             for (auto& transition : cur->transitions) {
                 State* state = transition.first;
                 if (state->name.empty()) {
-                    state->name = "q" + std::to_string(c++);
+                    state->name = "q" + to_string(c++);
                     states_queue.push_back(state);
                 }
             }
         }
     }
 
-    void printTuple(const std::string& path) {
+    void printTuple(const string& path) {
         json js;
         for (auto state : states) {
             js["states"].push_back(state->name);
         }
         for (char c : alphabet) {
-            js["letters"].push_back(std::string(1, c));
+            js["letters"].push_back(string(1, c));
         }
         for (auto state : states) {
             for (auto& transition : state->transitions) {
-                js["transition_function"].push_back({state->name, std::string(1, transition.second), transition.first->name});
+                js["transition_function"].push_back({state->name, string(1, transition.second), transition.first->name});
             }
         }
         js["start_states"] = {start->name};
@@ -104,13 +105,13 @@ public:
             js["final_states"].push_back(state->name);
         }
 
-        std::ofstream file(path);
-        file << std::setw(4) << js << std::endl;
+        ofstream file(path);
+        file << setw(4) << js << endl;
     }
 };
 
-std::string addConcat(const std::string& regEx) {
-    std::string res;
+string addConcat(const string& regEx) {
+    string res;
     for (size_t i = 0; i < regEx.size(); ++i) {
         res.push_back(regEx[i]);
         if (regEx[i] != '(' && regEx[i] != '.' && regEx[i] != '+') {
@@ -122,17 +123,17 @@ std::string addConcat(const std::string& regEx) {
     return res;
 }
 
-int parseRegEx(const std::string& regEx, std::vector<char>& postfix) {
+int parseRegEx(const string& regEx, vector<char>& postfix) {
     if (regEx.empty()) return VALID_REGEX;
 
     for (char a : regEx) {
-        if (ALLOWED.find(a) == std::string::npos) {
+        if (ALLOWED.find(a) == string::npos) {
             return INVALID_REGEX;
         }
     }
 
     postfix.clear();
-    std::stack<char> stack;
+    stack<char> stack;
     for (char a : regEx) {
         if (OPS.find(a) == OPS.end()) {
             postfix.push_back(a);
@@ -159,34 +160,34 @@ int parseRegEx(const std::string& regEx, std::vector<char>& postfix) {
     return VALID_REGEX;
 }
 
-std::string readJSON(const std::string& path) {
-    std::ifstream file(path);
+string readJSON(const string& path) {
+    ifstream file(path);
     json data;
     file >> data;
     return data.value("regex", "");
 }
 
-void visualize_nfa(const json& nfa_json, const std::string& output_path) {
-    std::ofstream dot(output_path + ".dot");
-    dot << "digraph NFA {" << std::endl;
+void visualize_nfa(const json& nfa_json, const string& output_path) {
+    ofstream dot(output_path + ".dot");
+    dot << "digraph NFA {" << endl;
     for (const auto& state : nfa_json["states"]) {
         dot << "    " << state;
-        if (std::find(nfa_json["final_states"].begin(), nfa_json["final_states"].end(), state) != nfa_json["final_states"].end()) {
+        if (find(nfa_json["final_states"].begin(), nfa_json["final_states"].end(), state) != nfa_json["final_states"].end()) {
             dot << " [shape=doublecircle]";
         }
-        dot << ";" << std::endl;
+        dot << ";" << endl;
     }
     for (const auto& transition : nfa_json["transition_function"]) {
-        std::string label = (transition[1] == "$") ? "ε" : transition[1].get<std::string>();
-        dot << "    " << transition[0] << " -> " << transition[2] << " [label=\"" << label << "\"];" << std::endl;
+        string label = (transition[1] == "$") ? "ε" : transition[1].get<string>();
+        dot << "    " << transition[0] << " -> " << transition[2] << " [label=\"" << label << "\"];" << endl;
     }
     for (const auto& start_state : nfa_json["start_states"]) {
-        dot << "    start [shape=point];" << std::endl;
-        dot << "    start -> " << start_state << ";" << std::endl;
+        dot << "    start [shape=point];" << endl;
+        dot << "    start -> " << start_state << ";" << endl;
     }
-    dot << "}" << std::endl;
+    dot << "}" << endl;
     dot.close();
-    std::string cmd = "dot -Tpng " + output_path + ".dot -o " + output_path + ".png";
+    string cmd = "dot -Tpng " + output_path + ".dot -o " + output_path + ".png";
     system(cmd.c_str());
     remove((output_path + ".dot").c_str());
 }
@@ -258,10 +259,10 @@ NFA kleene_star(NFA& nfa1) {
     return nfa;
 }
 
-NFA thompson(const std::string& regEx) {
-    std::vector<char> postfix;
+NFA thompson(const string& regEx) {
+    vector<char> postfix;
     if (parseRegEx(addConcat(regEx), postfix) == INVALID_REGEX) {
-        throw std::invalid_argument("Invalid regular expression");
+        throw invalid_argument("Invalid regular expression");
     }
 
     if (postfix.empty()) {
@@ -272,7 +273,7 @@ NFA thompson(const std::string& regEx) {
         return nfa;
     }
 
-    std::stack<NFA> stackNFA;
+    stack<NFA> stackNFA;
     for (char symbol : postfix) {
         if (OPS.find(symbol) == OPS.end()) {
             stackNFA.push(kleene_base_cases(symbol));
@@ -291,7 +292,7 @@ NFA thompson(const std::string& regEx) {
     }
 
     if (stackNFA.empty()) {
-        throw std::invalid_argument("Invalid regular expression");
+        throw invalid_argument("Invalid regular expression");
     }
 
     return stackNFA.top();
@@ -299,11 +300,11 @@ NFA thompson(const std::string& regEx) {
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: regex-NFA <input_json> <output_json>" << std::endl;
+        cerr << "Usage: regex-NFA <input_json> <output_json>" << endl;
         return 1;
     }
 
-    std::string regEx = readJSON(argv[1]);
+    string regEx = readJSON(argv[1]);
     if (regEx.empty()) {
         regEx = "";
     }
@@ -311,10 +312,10 @@ int main(int argc, char* argv[]) {
     NFA nfa = thompson(regEx);
     nfa.getAlph(regEx);
     nfa.names();
-    std::string output_path = argv[2];
+    string output_path = argv[2];
     nfa.printTuple(output_path);
 
-    std::ifstream file(output_path);
+    ifstream file(output_path);
     json nfa_json;
     file >> nfa_json;
     visualize_nfa(nfa_json, output_path.substr(0, output_path.find_last_of('.')));
