@@ -1,0 +1,3 @@
+C:/Users/Usuario/Desktop/Facultad/3 ANIO/Lenguajes Formales y Automatas/RegexNFA/build/CMakeFiles/RegexNFA.dir
+C:/Users/Usuario/Desktop/Facultad/3 ANIO/Lenguajes Formales y Automatas/RegexNFA/build/CMakeFiles/edit_cache.dir
+C:/Users/Usuario/Desktop/Facultad/3 ANIO/Lenguajes Formales y Automatas/RegexNFA/build/CMakeFiles/rebuild_cache.dir

@@ -1,140 +1,323 @@
 #include <iostream>
-#include <stack>
+#include <vector>
 #include <string>
 #include <fstream>
-#include <vector>
+#include <sstream>
+#include <unordered_map>
+#include <unordered_set>
+#include <stack>
+#include "json.hpp"
 
-struct State {
+using json = nlohmann::json;
+
+const std::string ALLOWED = "0123456789qwertyuiopasdfghjklzxcvbnm*.+()$";
+const std::unordered_set<char> OPS = {'*', '.', '+', '(', ')'};
+const std::unordered_map<char, int> PRIORITY = {{'*', 2}, {'.', 1}, {'+', 0}};
+const int INVALID_REGEX = -1;
+const int VALID_REGEX = 0;
+
+class State {
+public:
     int id;
-    std::string label;
-    State(int id, const std::string& label) : id(id), label(label) {}
+    std::string name;
+    std::vector<std::pair<State*, char>> transitions;
+    static int count;
+
+    State() : id(count++), name("") {}
+
+    void addTransition(State* node, char alph) {
+        transitions.push_back({node, alph});
+    }
 };
 
-struct Transition {
-    int from;
-    int to;
-    std::string symbol;
-    Transition(int from, int to, const std::string& symbol) : from(from), to(to), symbol(symbol) {}
-};
+int State::count = 0;
 
 class NFA {
 public:
-    std::vector<State> states;
-    std::vector<Transition> transitions;
-    int start;
-    int accept;
+    std::vector<State*> states;
+    State* start;
+    std::vector<State*> accept;
+    std::unordered_set<char> alphabet;
 
-    NFA() : start(-1), accept(-1) {}
+    NFA() : start(nullptr) {}
 
-    NFA(char symbol, int& idCounter) {
-        start = idCounter++;
-        accept = idCounter++;
-        int mid = idCounter++;
-        states.push_back(State(start, "start"));
-        states.push_back(State(mid, std::string(1, symbol)));
-        states.push_back(State(accept, "accept"));
-        transitions.push_back(Transition(start, mid, std::string(1, symbol)));
-        transitions.push_back(Transition(mid, accept, ""));
-    }
-
-    static NFA concatenate(NFA nfa1, NFA nfa2, int& idCounter) {
-        NFA result;
-        result.start = nfa1.start;
-        result.accept = nfa2.accept;
-        result.states = nfa1.states;
-        result.states.insert(result.states.end(), nfa2.states.begin(), nfa2.states.end());
-        result.transitions = nfa1.transitions;
-        result.transitions.insert(result.transitions.end(), nfa2.transitions.begin(), nfa2.transitions.end());
-        result.transitions.push_back(Transition(nfa1.accept, nfa2.start, ""));
-        idCounter = result.add_states_ids(idCounter);
-        return result;
-    }
-
-    static NFA unite(NFA nfa1, NFA nfa2, int& idCounter) {
-        NFA result;
-        result.start = idCounter++;
-        result.accept = idCounter++;
-        result.states.push_back(State(result.start, "start"));
-        result.states.push_back(State(result.accept, "accept"));
-        result.states.insert(result.states.end(), nfa1.states.begin(), nfa1.states.end());
-        result.states.insert(result.states.end(), nfa2.states.begin(), nfa2.states.end());
-        result.transitions.push_back(Transition(result.start, nfa1.start, ""));
-        result.transitions.push_back(Transition(result.start, nfa2.start, ""));
-        result.transitions.insert(result.transitions.end(), nfa1.transitions.begin(), nfa1.transitions.end());
-        result.transitions.insert(result.transitions.end(), nfa2.transitions.begin(), nfa2.transitions.end());
-        result.transitions.push_back(Transition(nfa1.accept, result.accept, ""));
-        result.transitions.push_back(Transition(nfa2.accept, result.accept, ""));
-        idCounter = result.add_states_ids(idCounter);
-        return result;
-    }
-
-    static NFA kleene_star(NFA nfa, int& idCounter) {
-        NFA result;
-        result.start = idCounter++;
-        result.accept = idCounter++;
-        result.states.push_back(State(result.start, "start"));
-        result.states.push_back(State(result.accept, "accept"));
-        result.states.insert(result.states.end(), nfa.states.begin(), nfa.states.end());
-        result.transitions.push_back(Transition(result.start, nfa.start, ""));
-        result.transitions.push_back(Transition(nfa.accept, nfa.start, ""));
-        result.transitions.push_back(Transition(nfa.accept, result.accept, ""));
-        result.transitions.push_back(Transition(result.start, result.accept, ""));
-        result.transitions.insert(result.transitions.end(), nfa.transitions.begin(), nfa.transitions.end());
-        idCounter = result.add_states_ids(idCounter);
-        return result;
-    }
-
-    int add_states_ids(int start_id) {
-        for (auto& state : states) {
-            state.id = start_id++;
+    void getAlph(const std::string& regex) {
+        for (char c : regex) {
+            if (OPS.find(c) == OPS.end() && alphabet.find(c) == alphabet.end()) {
+                alphabet.insert(c);
+            }
         }
-        return start_id;
     }
 
-    void write_to_dot(const std::string& filename) {
-        std::ofstream dot_file(filename);
-        dot_file << "digraph NFA {" << std::endl;
-        for (const auto& state : states) {
-            dot_file << "  " << state.id << " [label=\"" << state.label << "\"];" << std::endl;
+    void addState(State* s) {
+        states.push_back(s);
+    }
+
+    void addTransition(State* s1, State* s2, char a) {
+        s1->addTransition(s2, a);
+    }
+
+    void makeStart(State* s) {
+        start = s;
+    }
+
+    void makeAccept(State* s) {
+        accept.push_back(s);
+    }
+
+    void removeAccept(State* s) {
+        accept.erase(std::remove(accept.begin(), accept.end(), s), accept.end());
+    }
+
+    void names() {
+        int c = 0;
+        start->name = "q" + std::to_string(c++);
+        std::vector<State*> states_queue = {start};
+        while (!states_queue.empty()) {
+            State* cur = states_queue.front();
+            states_queue.erase(states_queue.begin());
+            for (auto& transition : cur->transitions) {
+                State* state = transition.first;
+                if (state->name.empty()) {
+                    state->name = "q" + std::to_string(c++);
+                    states_queue.push_back(state);
+                }
+            }
         }
-        for (const auto& transition : transitions) {
-            dot_file << "  " << transition.from << " -> " << transition.to << " [label=\"" << transition.symbol << "\"];" << std::endl;
+    }
+
+    void printTuple(const std::string& path) {
+        json js;
+        for (auto state : states) {
+            js["states"].push_back(state->name);
         }
-        dot_file << "}" << std::endl;
-        dot_file.close();
+        for (char c : alphabet) {
+            js["letters"].push_back(std::string(1, c));
+        }
+        for (auto state : states) {
+            for (auto& transition : state->transitions) {
+                js["transition_function"].push_back({state->name, std::string(1, transition.second), transition.first->name});
+            }
+        }
+        js["start_states"] = {start->name};
+        for (auto state : accept) {
+            js["final_states"].push_back(state->name);
+        }
+
+        std::ofstream file(path);
+        file << std::setw(4) << js << std::endl;
     }
 };
 
-NFA regex_to_nfa(const std::string& regex) {
-    std::stack<NFA> stack;
-    int idCounter = 0;
+std::string addConcat(const std::string& regEx) {
+    std::string res;
+    for (size_t i = 0; i < regEx.size(); ++i) {
+        res.push_back(regEx[i]);
+        if (regEx[i] != '(' && regEx[i] != '.' && regEx[i] != '+') {
+            if (i + 1 < regEx.size() && regEx[i + 1] != ')' && regEx[i + 1] != '*' && regEx[i + 1] != '+' && regEx[i + 1] != '.') {
+                res.push_back('.');
+            }
+        }
+    }
+    return res;
+}
 
-    for (char c : regex) {
-        if (c == '*') {
-            NFA nfa = stack.top(); stack.pop();
-            stack.push(NFA::kleene_star(nfa, idCounter));
-        } else if (c == '|') {
-            NFA nfa2 = stack.top(); stack.pop();
-            NFA nfa1 = stack.top(); stack.pop();
-            stack.push(NFA::unite(nfa1, nfa2, idCounter));
-        } else if (c == '.') {
-            NFA nfa2 = stack.top(); stack.pop();
-            NFA nfa1 = stack.top(); stack.pop();
-            stack.push(NFA::concatenate(nfa1, nfa2, idCounter));
-        } else {
-            stack.push(NFA(c, idCounter));
+int parseRegEx(const std::string& regEx, std::vector<char>& postfix) {
+    if (regEx.empty()) return VALID_REGEX;
+
+    for (char a : regEx) {
+        if (ALLOWED.find(a) == std::string::npos) {
+            return INVALID_REGEX;
         }
     }
 
-    return stack.top();
+    postfix.clear();
+    std::stack<char> stack;
+    for (char a : regEx) {
+        if (OPS.find(a) == OPS.end()) {
+            postfix.push_back(a);
+        } else if (a == '(') {
+            stack.push('(');
+        } else if (a == ')') {
+            while (!stack.empty() && stack.top() != '(') {
+                postfix.push_back(stack.top());
+                stack.pop();
+            }
+            stack.pop();
+        } else {
+            while (!stack.empty() && stack.top() != '(' && PRIORITY.at(a) <= PRIORITY.at(stack.top())) {
+                postfix.push_back(stack.top());
+                stack.pop();
+            }
+            stack.push(a);
+        }
+    }
+    while (!stack.empty()) {
+        postfix.push_back(stack.top());
+        stack.pop();
+    }
+    return VALID_REGEX;
 }
 
-int main() {
-    std::string regex = "a.b|c*";
-    NFA nfa = regex_to_nfa(regex);
-    std::cout << "Generando archivo nfa.dot..." << std::endl;
-    nfa.write_to_dot("nfa.dot");
-    std::cout << "El archivo nfa.dot ha sido creado. Usa Graphviz para visualizarlo." << std::endl;
+std::string readJSON(const std::string& path) {
+    std::ifstream file(path);
+    json data;
+    file >> data;
+    return data.value("regex", "");
+}
+
+void visualize_nfa(const json& nfa_json, const std::string& output_path) {
+    std::ofstream dot(output_path + ".dot");
+    dot << "digraph NFA {" << std::endl;
+    for (const auto& state : nfa_json["states"]) {
+        dot << "    " << state;
+        if (std::find(nfa_json["final_states"].begin(), nfa_json["final_states"].end(), state) != nfa_json["final_states"].end()) {
+            dot << " [shape=doublecircle]";
+        }
+        dot << ";" << std::endl;
+    }
+    for (const auto& transition : nfa_json["transition_function"]) {
+        std::string label = (transition[1] == "$") ? "ε" : transition[1].get<std::string>();
+        dot << "    " << transition[0] << " -> " << transition[2] << " [label=\"" << label << "\"];" << std::endl;
+    }
+    for (const auto& start_state : nfa_json["start_states"]) {
+        dot << "    start [shape=point];" << std::endl;
+        dot << "    start -> " << start_state << ";" << std::endl;
+    }
+    dot << "}" << std::endl;
+    dot.close();
+    std::string cmd = "dot -Tpng " + output_path + ".dot -o " + output_path + ".png";
+    system(cmd.c_str());
+    remove((output_path + ".dot").c_str());
+}
+
+NFA kleene_base_cases(char symbol) {
+    NFA nfa;
+    if (symbol == '$') {
+        State* start_state = new State();
+        nfa.addState(start_state);
+        nfa.makeStart(start_state);
+        nfa.makeAccept(start_state);
+        return nfa;
+    }
+    if (symbol == '\0' || symbol == ' ') {
+        State* start_state = new State();
+        nfa.addState(start_state);
+        nfa.makeStart(start_state);
+        return nfa;
+    } else {
+        State* q0 = new State();
+        nfa.addState(q0);
+        nfa.makeStart(q0);
+        State* q1 = new State();
+        nfa.addState(q1);
+        nfa.makeAccept(q1);
+        nfa.addTransition(q0, q1, symbol);
+        return nfa;
+    }
+}
+
+NFA kleene_union(NFA& nfa1, NFA& nfa2) {
+    NFA nfa;
+    State* start = new State();
+    nfa.addState(start);
+    nfa.makeStart(start);
+    nfa.addTransition(start, nfa1.start, '$');
+    nfa.addTransition(start, nfa2.start, '$');
+    nfa.states.insert(nfa.states.end(), nfa1.states.begin(), nfa1.states.end());
+    nfa.states.insert(nfa.states.end(), nfa2.states.begin(), nfa2.states.end());
+    nfa.accept.insert(nfa.accept.end(), nfa1.accept.begin(), nfa1.accept.end());
+    nfa.accept.insert(nfa.accept.end(), nfa2.accept.begin(), nfa2.accept.end());
+    return nfa;
+}
+
+NFA kleene_concat(NFA& nfa1, NFA& nfa2) {
+    NFA nfa;
+    nfa.states.insert(nfa.states.end(), nfa1.states.begin(), nfa1.states.end());
+    nfa.states.insert(nfa.states.end(), nfa2.states.begin(), nfa2.states.end());
+    nfa.start = nfa1.start;
+    nfa.accept = nfa2.accept;
+    for (auto accept_state : nfa1.accept) {
+        accept_state->addTransition(nfa2.start, '$');
+    }
+    return nfa;
+}
+
+NFA kleene_star(NFA& nfa1) {
+    NFA nfa;
+    State* start = new State();
+    nfa.addState(start);
+    nfa.makeStart(start);
+    nfa.addTransition(start, nfa1.start, '$');
+    for (auto accept_state : nfa1.accept) {
+        nfa.addTransition(accept_state, nfa1.start, '$');
+        nfa.addTransition(accept_state, start, '$');
+    }
+    nfa.states.insert(nfa.states.end(), nfa1.states.begin(), nfa1.states.end());
+    nfa.makeAccept(start);
+    return nfa;
+}
+
+NFA thompson(const std::string& regEx) {
+    std::vector<char> postfix;
+    if (parseRegEx(addConcat(regEx), postfix) == INVALID_REGEX) {
+        throw std::invalid_argument("Invalid regular expression");
+    }
+
+    if (postfix.empty()) {
+        NFA nfa;
+        State* start_state = new State();
+        nfa.addState(start_state);
+        nfa.makeStart(start_state);
+        return nfa;
+    }
+
+    std::stack<NFA> stackNFA;
+    for (char symbol : postfix) {
+        if (OPS.find(symbol) == OPS.end()) {
+            stackNFA.push(kleene_base_cases(symbol));
+        } else if (symbol == '+') {
+            NFA N2 = stackNFA.top(); stackNFA.pop();
+            NFA N1 = stackNFA.top(); stackNFA.pop();
+            stackNFA.push(kleene_union(N1, N2));
+        } else if (symbol == '.') {
+            NFA N2 = stackNFA.top(); stackNFA.pop();
+            NFA N1 = stackNFA.top(); stackNFA.pop();
+            stackNFA.push(kleene_concat(N1, N2));
+        } else if (symbol == '*') {
+            NFA N = stackNFA.top(); stackNFA.pop();
+            stackNFA.push(kleene_star(N));
+        }
+    }
+
+    if (stackNFA.empty()) {
+        throw std::invalid_argument("Invalid regular expression");
+    }
+
+    return stackNFA.top();
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 3) {
+        std::cerr << "Usage: regex-NFA <input_json> <output_json>" << std::endl;
+        return 1;
+    }
+
+    std::string regEx = readJSON(argv[1]);
+    if (regEx.empty()) {
+        regEx = "";
+    }
+
+    NFA nfa = thompson(regEx);
+    nfa.getAlph(regEx);
+    nfa.names();
+    std::string output_path = argv[2];
+    nfa.printTuple(output_path);
+
+    std::ifstream file(output_path);
+    json nfa_json;
+    file >> nfa_json;
+    visualize_nfa(nfa_json, output_path.substr(0, output_path.find_last_of('.')));
 
     return 0;
 }

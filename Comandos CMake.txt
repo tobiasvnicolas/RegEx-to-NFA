@@ -1,0 +1,10 @@
+cd build
+
+cmake -G "MinGW Makefiles" ..
+
+mingw32-make
+
+cmake --build .
+
+cd ..\output
+.\main.exe ..\regex.json ..\output.json

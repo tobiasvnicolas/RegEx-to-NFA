@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/Users/Usuario/Desktop/Facultad/3 AÑO/Lenguajes Formales y Automatas/ER a AF",
-      "program": "c:/Users/Usuario/Desktop/Facultad/3 AÑO/Lenguajes Formales y Automatas/ER a AF/build/Debug/outDebug",
+      "cwd": "c:/Users/Usuario/Desktop/Facultad/3 AÑO/Lenguajes Formales y Automatas/ER-AFN",
+      "program": "c:/Users/Usuario/Desktop/Facultad/3 AÑO/Lenguajes Formales y Automatas/ER-AFN/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

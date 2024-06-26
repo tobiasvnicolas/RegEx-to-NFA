@@ -1,0 +1,19 @@
+esta es la  estructura del proyecto:
+
+RegexNFA {
+	build {
+		CMakeFiles {
+		...
+		}
+		cmake_install.cmake
+		CMakeCache.txt
+		MakeFile
+	}
+	output {
+		main.exe
+	}
+	CMakeList.txt
+	json.hpp
+	main.cpp
+	regex.json
+}
