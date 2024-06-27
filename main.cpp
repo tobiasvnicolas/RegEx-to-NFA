@@ -11,8 +11,8 @@
 using namespace std;
 using json = nlohmann::json;
 
-const string ALLOWED = "0123456789qwertyuiopasdfghjklzxcvbnm*.+()$";
-const unordered_set<char> OPS = {'*', '.', '+', '(', ')'};
+const string ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz*.+()$";
+const unordered_set<char> OPERATORS = {'*', '.', '+', '(', ')'};
 const unordered_map<char, int> PRIORITY = {{'*', 2}, {'.', 1}, {'+', 0}};
 const int INVALID_REGEX = -1;
 const int VALID_REGEX = 0;
@@ -44,7 +44,7 @@ public:
 
     void getAlph(const string& regex) {
         for (char c : regex) {
-            if (OPS.find(c) == OPS.end() && alphabet.find(c) == alphabet.end()) {
+            if (OPERATORS.find(c) == OPERATORS.end() && alphabet.find(c) == alphabet.end()) {
                 alphabet.insert(c);
             }
         }
@@ -87,7 +87,7 @@ public:
         }
     }
 
-    void printTuple(const string& path) {
+    void nfaJson(const string& path) {
         json js;
         for (auto state : states) {
             js["states"].push_back(state->name);
@@ -127,7 +127,7 @@ int parseRegEx(const string& regEx, vector<char>& postfix) {
     if (regEx.empty()) return VALID_REGEX;
 
     for (char a : regEx) {
-        if (ALLOWED.find(a) == string::npos) {
+        if (ALPHABET.find(a) == string::npos) {
             return INVALID_REGEX;
         }
     }
@@ -135,7 +135,7 @@ int parseRegEx(const string& regEx, vector<char>& postfix) {
     postfix.clear();
     stack<char> stack;
     for (char a : regEx) {
-        if (OPS.find(a) == OPS.end()) {
+        if (OPERATORS.find(a) == OPERATORS.end()) {
             postfix.push_back(a);
         } else if (a == '(') {
             stack.push('(');
@@ -275,7 +275,7 @@ NFA thompson(const string& regEx) {
 
     stack<NFA> stackNFA;
     for (char symbol : postfix) {
-        if (OPS.find(symbol) == OPS.end()) {
+        if (OPERATORS.find(symbol) == OPERATORS.end()) {
             stackNFA.push(kleene_base_cases(symbol));
         } else if (symbol == '+') {
             NFA N2 = stackNFA.top(); stackNFA.pop();
@@ -313,7 +313,7 @@ int main(int argc, char* argv[]) {
     nfa.getAlph(regEx);
     nfa.names();
     string output_path = argv[2];
-    nfa.printTuple(output_path);
+    nfa.nfaJson(output_path);
 
     ifstream file(output_path);
     json nfa_json;
